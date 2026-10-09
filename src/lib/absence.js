@@ -24,6 +24,7 @@
 export const DEFAULT_SETTINGS = {
   work_start_time: '08:00:00',
   work_end_time: '17:00:00',
+  grace_period_minutes: 15,
 };
 
 const dateFormatterCache = new Map();

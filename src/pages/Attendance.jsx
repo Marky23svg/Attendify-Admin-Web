@@ -172,6 +172,33 @@ function getDayHours(inTime, outTime) {
   return Math.round(diff * 100) / 100;
 }
 
+/**
+ * Recompute attendance status from a corrected time-in.
+ *
+ * The corrected time is stored as a true UTC instant. The intended local
+ * wall-clock is recovered by adding the correction's stored offset (minutes
+ * east of UTC), exactly like the DB trigger `apply_time_correction`. This is
+ * timezone-independent, so it does not depend on the admin browser's zone.
+ * Falls back to the browser-local clock only when no offset is available.
+ */
+function recomputeStatus(
+  correctedTimeIso,
+  workStart,
+  gracePeriodMinutes,
+  timezoneOffsetMinutes
+) {
+  const d = new Date(correctedTimeIso);
+  const offset = Number(timezoneOffsetMinutes);
+  const utcMins =
+    d.getUTCHours() * 60 + d.getUTCMinutes() + d.getUTCSeconds() / 60;
+  const clockMins = Number.isFinite(offset)
+    ? (((utcMins + offset) % 1440) + 1440) % 1440
+    : d.getHours() * 60 + d.getMinutes() + d.getSeconds() / 60;
+  const [h = 0, m = 0] = String(workStart || '').split(':').map(Number);
+  const latestMins = h * 60 + m + (Number(gracePeriodMinutes) || 0);
+  return clockMins <= latestMins ? 'present' : 'late';
+}
+
 export default function Attendance() {
   const today = new Date();
   const [activeTab, setActiveTab] = useState('date');
@@ -206,7 +233,7 @@ export default function Attendance() {
     let active = true;
     supabase
       .from('settings')
-      .select('work_start_time, work_end_time')
+      .select('work_start_time, work_end_time, grace_period_minutes')
       .eq('id', 1)
       .maybeSingle()
       .then(({ data }) => {
@@ -266,10 +293,45 @@ export default function Attendance() {
         (profiles || []).forEach((p) => { profileMap[p.id] = p; });
       }
 
-      const merged = (attData || []).map((r) => ({
-        ...r,
-        profile: profileMap[r.user_id] || null,
-      }));
+      // Apply approved time-in corrections so the day list reflects the
+      // corrected status even if the DB trigger has not run.
+      const attIds = (attData || []).map((r) => r.id);
+      const correctedById = {};
+      if (attIds.length > 0) {
+        const { data: correctionRows, error: correctionError } = await supabase
+          .from('time_corrections')
+          .select('attendance_id, corrected_time, timezone_offset_minutes')
+          .eq('field', 'time_in')
+          .eq('status', 'approved')
+          .in('attendance_id', attIds);
+        if (correctionError) {
+          console.error('Time corrections load error:', correctionError);
+        }
+        for (const c of correctionRows || []) {
+          if (!correctedById[String(c.attendance_id)]) {
+            correctedById[String(c.attendance_id)] = {
+              time: c.corrected_time,
+              offset: c.timezone_offset_minutes,
+            };
+          }
+        }
+      }
+
+      const merged = (attData || []).map((r) => {
+        const correction = correctedById[String(r.id)];
+        return {
+          ...r,
+          status: correction
+            ? recomputeStatus(
+                correction.time,
+                workSchedule.work_start_time,
+                workSchedule.grace_period_minutes,
+                correction.offset
+              )
+            : r.status,
+          profile: profileMap[r.user_id] || null,
+        };
+      });
 
       // Approved leave requests covering the selected date
       const { data: leaveRows } = await supabase
@@ -318,7 +380,8 @@ export default function Attendance() {
     if (activeTab === 'date') {
       loadAttendance(selectedDate);
     }
-  }, [selectedDate, activeTab]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDate, activeTab, workSchedule]);
 
   // ---------- By Employee: load list ----------
   const loadEmployees = async () => {
@@ -371,7 +434,38 @@ export default function Attendance() {
       const map = {};
       const urlMap = {};
 
+      // Apply approved time-in corrections so the calendar reflects the
+      // corrected status even if the DB trigger has not run.
+      const { data: correctionRows, error: correctionError } = await supabase
+        .from('time_corrections')
+        .select('attendance_id, corrected_time, timezone_offset_minutes')
+        .eq('user_id', employeeId)
+        .eq('field', 'time_in')
+        .eq('status', 'approved');
+      if (correctionError) {
+        console.error('Time corrections load error:', correctionError);
+      }
+
+      const correctedById = {};
+      for (const c of correctionRows || []) {
+        if (!correctedById[String(c.attendance_id)]) {
+          correctedById[String(c.attendance_id)] = {
+            time: c.corrected_time,
+            offset: c.timezone_offset_minutes,
+          };
+        }
+      }
+
       for (const r of data || []) {
+        const correction = correctedById[String(r.id)];
+        if (correction) {
+          r.status = recomputeStatus(
+            correction.time,
+            workSchedule.work_start_time,
+            workSchedule.grace_period_minutes,
+            correction.offset
+          );
+        }
         map[r.date] = r;
         if (r.time_in_selfie) {
           urlMap[`in-${r.id}`] = await getSignedUrl(r.time_in_selfie);
@@ -403,7 +497,8 @@ export default function Attendance() {
       loadEmployeeMonth(selectedEmployee.id, empMonthYear, empMonth);
       setEmpSelectedDay(null);
     }
-  }, [activeTab, selectedEmployee, empMonth, empMonthYear]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab, selectedEmployee, empMonth, empMonthYear, workSchedule]);
 
   // ---------- By Date derived ----------
   const daysInMonth = getDaysInMonth(viewYear, viewMonth);

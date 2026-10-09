@@ -74,24 +74,58 @@ export default function Login() {
   };
 
   return (
-    <div className="relative min-h-screen bg-[#F5F7FB] flex items-center justify-center p-6 overflow-hidden">
-      <div className="absolute -top-24 -left-24 w-96 h-96 rounded-full bg-[#0066FF] opacity-[0.06] blur-3xl pointer-events-none" />
-      <div className="absolute -bottom-32 -right-24 w-[28rem] h-[28rem] rounded-full bg-[#0066FF] opacity-[0.05] blur-3xl pointer-events-none" />
-      <div className="absolute top-1/3 -right-10 w-64 h-64 rounded-full bg-[#F45B69] opacity-[0.05] blur-3xl pointer-events-none" />
-
-      <div className="relative w-full max-w-md">
-        <div
-          className="bg-white rounded-3xl p-8 sm:p-10"
-          style={{ boxShadow: CARD_SHADOW }}
+    <div className="min-h-screen flex flex-col lg:flex-row">
+      {/* LEFT PANEL - Blue Section with Logo */}
+      <div className="relative lg:w-3/5 bg-[#0066FF] flex flex-col items-center justify-center p-10 lg:p-16 overflow-hidden">
+        {/* Decorative curved lines */}
+        <svg
+          className="absolute inset-0 w-full h-full opacity-[0.08] pointer-events-none"
+          viewBox="0 0 800 800"
+          fill="none"
         >
-          <div className="flex flex-col items-center mb-8">
-            <div className="w-24 h-24 rounded-3xl bg-[#0066FF] flex items-center justify-center shadow-[0_4px_16px_rgba(0,102,255,0.16)]">
-              <img src={logo} alt="Attendify" className="w-22 h-22 object-contain" />
-            </div>
-            <h1 className="mt-5 text-3xl font-extrabold text-[#0066FF] tracking-tight">
+          <circle cx="400" cy="400" r="200" stroke="white" strokeWidth="1" />
+          <circle cx="400" cy="400" r="320" stroke="white" strokeWidth="1" />
+          <circle cx="400" cy="400" r="460" stroke="white" strokeWidth="1" />
+          <circle cx="400" cy="400" r="600" stroke="white" strokeWidth="1" />
+        </svg>
+
+        <div className="relative z-10 flex flex-col items-center text-center -mt-30">
+          <img
+            src={logo}
+            alt="Attendify"
+            className="w-24 h-24 lg:w-28 lg:h-28 object-contain mb-6 -ml-73"
+          />
+          <h1 className="text-4xl lg:text-5xl font-extrabold text-white leading-tight tracking-tight text-left -ml-41">
+            Hello
+            <br />
+            Attendify!
+          </h1>
+          <p className="mt-6 text-base lg:text-lg text-white/80 max-w-sm leading-relaxed text-left">
+            Skip repetitive and manual attendance tasks. Get highly productive
+            through automation and save tons of time!
+          </p>
+        </div>
+
+        <p className="absolute bottom-6 left-0 right-0 text-center text-xs text-white/50">
+  © {new Date().getFullYear()} Attendify. All rights reserved.
+</p>
+      </div>
+
+      {/* RIGHT PANEL - White Section with Form */}
+      <div className="lg:w-2/5 flex items-center justify-center bg-white p-6 sm:p-10 lg:p-16">
+        <div className="w-full max-w-md">
+          {/* Small logo / brand name at top */}
+          <div className="mb-20 -mt-14">
+            <h2 className="text-2xl font-extrabold text-[#0F1E36] tracking-tight">
               Attendify
-            </h1>
-            <p className="mt-1 text-sm text-[#64748B]">Sign in to continue</p>
+            </h2>
+          </div>
+
+          <div className="mb-8">
+            <h3 className="text-3xl font-extrabold text-[#0F1E36] tracking-tight">
+              Welcome Back Admin!
+            </h3>
+          
           </div>
 
           {banner && (
@@ -101,7 +135,7 @@ export default function Login() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} noValidate className="space-y-4">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             <Field
               id="email"
               type="email"
@@ -133,11 +167,7 @@ export default function Login() {
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
                   className="text-gray-400 hover:text-[#0F1E36] transition"
                 >
-                  {showPassword ? (
-                    <EyeOff size={18} />
-                  ) : (
-                    <Eye size={18} />
-                  )}
+                  {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                 </button>
               }
             />
@@ -145,7 +175,7 @@ export default function Login() {
             <button
               type="submit"
               disabled={submitting}
-              className="w-full flex items-center justify-center gap-2 bg-[#0066FF] text-white font-bold rounded-2xl py-4 px-6 shadow-[0_4px_12px_rgba(0,102,255,0.30)] hover:bg-[#0052CC] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed mt-6"
+              className="w-full flex items-center justify-center gap-2 bg-[#0F1E36] text-white font-bold rounded-2xl py-4 px-6 hover:bg-[#1E3A5F] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed mt-6"
             >
               {submitting ? (
                 <>
@@ -154,17 +184,15 @@ export default function Login() {
                 </>
               ) : (
                 <>
-                  Log In
+                  Login
                   <ArrowRight size={18} />
                 </>
               )}
             </button>
+
+            
           </form>
         </div>
-
-        <p className="text-center text-xs text-gray-400 mt-6">
-          Attendify Admin · Authorised personnel only
-        </p>
       </div>
     </div>
   );
