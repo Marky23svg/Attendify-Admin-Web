@@ -214,6 +214,7 @@ export default function Attendance() {
   const [loadingDate, setLoadingDate] = useState(false);
   const [search, setSearch] = useState('');
   const [signedUrls, setSignedUrls] = useState({});
+  const [dateExtra, setDateExtra] = useState({ absent: 0, leave: 0 });
 
   // ---------- By Employee tab ----------
   const [employees, setEmployees] = useState([]);
@@ -267,6 +268,7 @@ export default function Attendance() {
     setLoadingDate(true);
     setError(null);
     setSignedUrls({});
+    setDateExtra({ absent: 0, leave: 0 });
 
     try {
       const dateStr = toDateString(date);
@@ -356,6 +358,46 @@ export default function Attendance() {
         }
       });
 
+      // Employees with a 'leave' status record are on leave too, whether or
+      // not an approved leave_request row covers the date.
+      merged.forEach((r) => {
+        if (r.status === 'leave') onLeaveIds.add(r.user_id);
+      });
+
+      // Staff absent on the selected date: count every active employee who
+      // has no attended record and no approved leave, using the shared
+      // absence rules (same as the Dashboard). Employees with no attendance
+      // row at all would otherwise never be counted.
+      const { data: staffRows } = await supabase
+        .from('profiles')
+        .select('id, created_at, role')
+        .eq('is_active', true);
+
+      const dayKey = dateStr;
+      const attendedIds = new Set(
+        merged
+          .filter((r) => ['present', 'late', 'half-day'].includes(r.status))
+          .map((r) => r.user_id)
+      );
+      const now = new Date();
+      let absentCount = 0;
+      (staffRows || []).forEach((s) => {
+        if (s.role === 'admin') return;
+        if (
+          isAbsenceDay(dayKey, {
+            now,
+            settings: workSchedule,
+            createdAtKey: s.created_at ? toDateString(new Date(s.created_at)) : null,
+            attended: (k) => k === dayKey && attendedIds.has(s.user_id),
+            onApprovedLeave: (k) => k === dayKey && onLeaveIds.has(s.user_id),
+          })
+        ) {
+          absentCount += 1;
+        }
+      });
+
+      setDateExtra({ absent: absentCount, leave: onLeaveIds.size });
+
       setRecords(merged);
 
       const urlMap = {};
@@ -390,6 +432,7 @@ export default function Attendance() {
       const { data } = await supabase
         .from('profiles')
         .select('id, full_name, email, employee_id, department, position, role, created_at, avatar_url')
+        .eq('is_active', true)
         .order('full_name', { ascending: true });
       setEmployees(data || []);
     } catch (err) {
@@ -538,10 +581,8 @@ export default function Attendance() {
   const dateStats = useMemo(() => {
     const present = records.filter((r) => ['present', 'late', 'half-day'].includes(r.status)).length;
     const late = records.filter((r) => r.status === 'late').length;
-    const absent = records.filter((r) => r.status === 'absent').length;
-    const leave = records.filter((r) => r.status === 'leave').length;
-    return { present, late, absent, leave, total: records.length };
-  }, [records]);
+    return { present, late, absent: dateExtra.absent, leave: dateExtra.leave, total: records.length };
+  }, [records, dateExtra]);
 
   const handleSelectDate = (day) => {
     setSelectedDate(new Date(viewYear, viewMonth, day));

@@ -9,13 +9,14 @@ const TONES = {
   red: { badge: '#FEE9EB', icon: '#DC2626' },
 };
 
-export default function StatCard({ icon: Icon, label, value, tone = 'blue', trend }) {
+export default function StatCard({ icon: Icon, label, value, tone = 'blue', trend, loading = false }) {
   const palette = TONES[tone] ?? TONES.blue;
 
   return (
     <div
       className="bg-white rounded-3xl p-6 border border-[#E8EDF5]"
       style={{ boxShadow: CARD_SHADOW }}
+      aria-busy={loading}
     >
       <div className="flex items-start justify-between">
         <div
@@ -33,9 +34,17 @@ export default function StatCard({ icon: Icon, label, value, tone = 'blue', tren
         )}
       </div>
 
-      <p className="mt-4 text-3xl font-bold text-[#0F1E36] tracking-tight">
-        {value}
-      </p>
+      {loading ? (
+        <div
+          className="mt-4 h-9 w-16 rounded-lg bg-[#F8FAFD] animate-pulse"
+          role="status"
+          aria-label="Loading"
+        />
+      ) : (
+        <p className="mt-4 text-3xl font-bold text-[#0F1E36] tracking-tight">
+          {value}
+        </p>
+      )}
       <p className="mt-1 text-sm text-[#64748B]">{label}</p>
     </div>
   );

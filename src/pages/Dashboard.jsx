@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+﻿import { useEffect, useMemo, useState } from 'react';
 import {
   Users,
   UserCheck,
@@ -244,26 +244,30 @@ export default function Dashboard() {
         <StatCard
           icon={Users}
           label="Total Employees"
-          value={loading ? 'â€”' : stats.total}
+          value={stats.total}
           tone="blue"
+          loading={loading}
         />
         <StatCard
           icon={UserCheck}
           label="Present Today"
-          value={loading ? 'â€”' : stats.present}
+          value={stats.present}
           tone="green"
+          loading={loading}
         />
         <StatCard
           icon={CalendarOff}
           label="On Leave"
-          value={loading ? 'â€”' : stats.onLeave}
+          value={stats.onLeave}
           tone="orange"
+          loading={loading}
         />
         <StatCard
           icon={UserX}
           label="Absent"
-          value={loading ? 'â€”' : stats.absent}
+          value={stats.absent}
           tone="red"
+          loading={loading}
         />
       </div>
 
@@ -282,7 +286,7 @@ export default function Dashboard() {
         >
           <div className="flex items-center justify-between px-6 py-5 border-b border-[#E5E7EB]">
             <h3 className="font-bold text-[#0F1E36] tracking-tight">
-              Pending Approvals
+              Pending Leave Approvals
             </h3>
             <span className="rounded-full bg-[#FEF3C7] text-[#D97706] text-xs font-semibold px-3 py-1">
               {stats.pendingCount} pending
@@ -398,13 +402,13 @@ export default function Dashboard() {
                             hour: '2-digit',
                             minute: '2-digit',
                             hour12: true,
-                          })}`
+                          })} · ${formatDate(a.time_out)}`
                           : a.time_in
                             ? `Clocked in at ${new Date(a.time_in).toLocaleTimeString('en-US', {
                               hour: '2-digit',
                               minute: '2-digit',
                               hour12: true,
-                            })}`
+                            })} · ${formatDate(a.time_in)}`
                             : formatDate(a.created_at)}
                       </p>
                     </div>

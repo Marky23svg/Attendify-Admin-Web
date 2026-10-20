@@ -18,7 +18,7 @@ const NAV_ITEMS = [
   { to: '/employees', label: 'Employees', icon: Users },
   { to: '/approvals/leaves', label: 'Leave Approvals', icon: CheckCircle2 },
   { to: '/attendance', label: 'Attendance', icon: ClipboardList },
-  { to: '/reports', label: 'Reports', icon: BarChart3 },
+  
 ];
 
 export default function Sidebar({ open, onClose }) {

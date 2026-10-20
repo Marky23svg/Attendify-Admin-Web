@@ -7,6 +7,8 @@ import {
   AlertCircle,
   ChevronDown,
   Pencil,
+  UserCheck,
+  UserX,
   X,
   Loader2,
   User,
@@ -59,8 +61,9 @@ function FilterSelect({ value, onChange, children, icon: Icon }) {
       <select
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className={`appearance-none bg-transparent text-sm text-[#0F1E36] outline-none cursor-pointer py-3 pr-9 ${Icon ? 'pl-2.5' : 'pl-4'
-          } w-full min-w-[9rem]`}
+        className={`appearance-none bg-transparent text-sm text-[#0F1E36] outline-none cursor-pointer py-3 pr-9 ${
+          Icon ? 'pl-2.5' : 'pl-4'
+        } w-full min-w-[9rem]`}
       >
         {children}
       </select>
@@ -77,8 +80,9 @@ function RoleBadge({ role }) {
   const isAdmin = role === 'admin';
   return (
     <span
-      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ${isAdmin ? 'bg-[#EAF2FF] text-[#0066FF]' : 'bg-[#F8FAFD] text-[#64748B]'
-        }`}
+      className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold capitalize ${
+        isAdmin ? 'bg-[#EAF2FF] text-[#0066FF]' : 'bg-[#F8FAFD] text-[#64748B]'
+      }`}
     >
       {role ?? 'employee'}
     </span>
@@ -114,10 +118,11 @@ function SelectField({
         {label}
       </label>
       <div
-        className={`flex items-center bg-white rounded-2xl px-4 border transition ${error
+        className={`flex items-center bg-white rounded-2xl px-4 border transition ${
+          error
             ? 'border-[#DC2626]'
             : 'border-[#E8EDF5] focus-within:border-[#0066FF] focus-within:ring-2 focus-within:ring-[#0066FF]/20'
-          } ${disabled ? 'opacity-50' : ''}`}
+        } ${disabled ? 'opacity-50' : ''}`}
       >
         <Icon size={18} color="#9CA3AF" className="shrink-0" />
         <select
@@ -125,7 +130,7 @@ function SelectField({
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 py-3.5 ml-3 bg-transparent text-sm text-[#0F1E36] outline-none cursor-pointer w-full min-w-0"
+          className="appearance-none flex-1 py-3.5 ml-3 pr-8 bg-transparent text-sm text-[#0F1E36] outline-none cursor-pointer w-full min-w-0"
         >
           {children}
         </select>
@@ -160,7 +165,13 @@ export default function Employees() {
   const [checkingId, setCheckingId] = useState(false);
 
   const [notice, setNotice] = useState(null);
+  const [actionError, setActionError] = useState(null);
   const [page, setPage] = useState(1);
+
+  const [deactivateTarget, setDeactivateTarget] = useState(null);
+  const [deactivating, setDeactivating] = useState(false);
+  const [deactivateError, setDeactivateError] = useState(null);
+  const [activatingId, setActivatingId] = useState(null);
 
   useEffect(() => {
     let active = true;
@@ -220,7 +231,9 @@ export default function Employees() {
   const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
 
   // Reset to page 1 when filters change
-  useEffect(() => { setPage(1); }, [search, department, role]);
+  useEffect(() => {
+    setPage(1);
+  }, [search, department, role]);
 
   useEffect(() => {
     if (!editing) return undefined;
@@ -233,6 +246,18 @@ export default function Employees() {
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [editing, saving]);
+
+  useEffect(() => {
+    if (!deactivateTarget) return undefined;
+
+    const onKeyDown = (event) => {
+      if (event.key !== 'Escape' || deactivating) return;
+      setDeactivateTarget(null);
+    };
+
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [deactivateTarget, deactivating]);
 
   const setField = (key, value) => {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -296,29 +321,114 @@ export default function Employees() {
     setEditing(employee);
   };
 
+  const openDeactivate = (employee) => {
+    setNotice(null);
+    setActionError(null);
+    setBanner(null);
+    setDeactivateError(null);
+    setDeactivateTarget(employee);
+  };
+
+  const handleDeactivate = async () => {
+    if (!deactivateTarget) return;
+    setDeactivating(true);
+    setDeactivateError(null);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not logged in');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-toggle-ban`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            targetUserId: deactivateTarget.id,
+            action: 'ban',
+          }),
+        }
+      );
+
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'Failed to communicate with Edge Function');
+      
+      const result = text ? JSON.parse(text) : {};
+
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === deactivateTarget.id ? { ...emp, is_active: false } : emp,
+        ),
+      );
+      setNotice(`${deactivateTarget.full_name || deactivateTarget.email} was deactivated.`);
+      setDeactivateTarget(null);
+    } catch (err) {
+      console.error('Deactivate error:', err);
+      setDeactivateError(err.message);
+    } finally {
+      setDeactivating(false);
+    }
+  };
+
+  const handleActivate = async (employee) => {
+    setNotice(null);
+    setActionError(null);
+    setActivatingId(employee.id);
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not logged in');
+
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-toggle-ban`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({
+            targetUserId: employee.id,
+            action: 'unban',
+          }),
+        }
+      );
+
+      const text = await response.text();
+      if (!response.ok) throw new Error(text || 'Failed to communicate with Edge Function');
+
+      const result = text ? JSON.parse(text) : {};
+
+      setEmployees((prev) =>
+        prev.map((emp) =>
+          emp.id === employee.id ? { ...emp, is_active: true } : emp,
+        ),
+      );
+      setNotice(`${employee.full_name || employee.email} was activated.`);
+    } catch (err) {
+      console.error('Activate error:', err);
+      setActionError(err.message);
+    } finally {
+      setActivatingId(null);
+    }
+  };
+
   const handleSave = async (e) => {
     e.preventDefault();
     setBanner(null);
-
-    console.log('=== SAVE DEBUG START ===');
-    console.log('Form state:', form);
-    console.log('Editing employee:', editing);
 
     if (form.email.trim() !== editing.email) {
       setBanner(
         'Changing email requires server-side code and is not available in this build.',
       );
-      console.log('SAVE ABORTED: email changed');
       return;
     }
 
     const isValid = await validate();
-    console.log('Validation result:', isValid, 'Errors:', errors);
-
-    if (!isValid) {
-      console.log('SAVE ABORTED: validation failed');
-      return;
-    }
+    if (!isValid) return;
 
     setSaving(true);
 
@@ -331,28 +441,15 @@ export default function Employees() {
       role: form.role,
     };
 
-    console.log('PAYLOAD:', payload);
-    console.log('EDITING ID:', editing.id);
-
-    const { data: { session }, error: sessionError } =
-      await supabase.auth.getSession();
-    console.log('SESSION:', session ? session.user.email : 'NO SESSION');
-    console.log('SESSION ERROR:', sessionError);
-
     const { data, error: updateError } = await supabase
       .from('profiles')
       .update(payload)
       .eq('id', editing.id)
       .select();
 
-    console.log('UPDATE DATA:', data);
-    console.log('UPDATE ERROR:', updateError);
-    console.log('ROWS UPDATED:', data?.length);
-
     if (updateError) {
       setBanner(`Could not save changes: ${updateError.message}`);
       setSaving(false);
-      console.log('=== SAVE DEBUG END (error) ===');
       return;
     }
 
@@ -361,7 +458,6 @@ export default function Employees() {
         'Save failed: 0 rows updated. This usually means RLS blocked the update or the row ID is wrong.',
       );
       setSaving(false);
-      console.log('=== SAVE DEBUG END (0 rows) ===');
       return;
     }
 
@@ -371,7 +467,6 @@ export default function Employees() {
     setNotice(`${payload.full_name} was updated.`);
     setEditing(null);
     setSaving(false);
-    console.log('=== SAVE DEBUG END (success) ===');
   };
 
   return (
@@ -389,18 +484,25 @@ export default function Employees() {
         </div>
 
         <button
-  onClick={() => navigate('/employees/add')}
-  className={`${PRIMARY_BUTTON} flex items-center justify-center gap-2 px-4 py-2.5 text-sm`}
->
-  <Plus size={16} />
-  Add Employee
-</button>
+          onClick={() => navigate('/employees/add')}
+          className={`${PRIMARY_BUTTON} flex items-center justify-center gap-2 px-4 py-2.5 text-sm`}
+        >
+          <Plus size={16} />
+          Add Employee
+        </button>
       </div>
 
       {notice && (
         <div className="flex items-start gap-2 bg-[#EAF8F0] text-[#16834A] text-sm rounded-2xl px-4 py-3 mb-6">
           <AlertCircle size={16} className="shrink-0 mt-0.5" />
           <span>{notice}</span>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="flex items-start gap-2 bg-[#FEE9EB] text-[#DC2626] text-sm rounded-2xl px-4 py-3 mb-6">
+          <AlertCircle size={16} className="shrink-0 mt-0.5" />
+          <span>{actionError}</span>
         </div>
       )}
 
@@ -485,10 +587,13 @@ export default function Employees() {
                 ) : (
                   paginated.map((e) => {
                     const name = e.full_name || e.email || 'Unnamed';
+                    const isActive = e.is_active !== false;
                     return (
                       <tr
                         key={e.id}
-                        className="border-t border-[#E5E7EB] hover:bg-[#F8FAFD] transition"
+                        className={`border-t border-[#E5E7EB] hover:bg-[#F8FAFD] transition ${
+                          isActive ? '' : 'opacity-60'
+                        }`}
                       >
                         <td className="px-4 py-4">
                           <div className="flex items-center gap-3">
@@ -519,7 +624,14 @@ export default function Employees() {
                           {e.position || '—'}
                         </td>
                         <td className="px-4 py-4">
-                          <RoleBadge role={e.role} />
+                          <div className="flex flex-wrap items-center gap-2">
+                            <RoleBadge role={e.role} />
+                            {!isActive && (
+                              <span className="inline-flex items-center rounded-full bg-[#FEE9EB] text-[#DC2626] px-3 py-1 text-xs font-semibold">
+                                Inactive
+                              </span>
+                            )}
+                          </div>
                         </td>
                         <td className="px-4 py-4">
                           <div className="flex items-center justify-end gap-1">
@@ -532,6 +644,32 @@ export default function Employees() {
                             >
                               <Pencil size={16} />
                             </button>
+                            {isActive ? (
+                              <button
+                                type="button"
+                                onClick={() => openDeactivate(e)}
+                                aria-label={`Deactivate ${name}`}
+                                title="Deactivate"
+                                className="p-2 rounded-xl text-gray-400 hover:text-[#DC2626] hover:bg-[#FEE9EB] transition"
+                              >
+                                <UserX size={16} />
+                              </button>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => handleActivate(e)}
+                                disabled={activatingId === e.id}
+                                aria-label={`Activate ${name}`}
+                                title="Activate"
+                                className="p-2 rounded-xl text-gray-400 hover:text-[#16834A] hover:bg-[#EAF8F0] transition disabled:opacity-50"
+                              >
+                                {activatingId === e.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <UserCheck size={16} />
+                                )}
+                              </button>
+                            )}
                           </div>
                         </td>
                       </tr>
@@ -633,13 +771,7 @@ export default function Employees() {
               </button>
             </div>
 
-            <div className="flex items-start gap-2 bg-[#EAF2FF] text-[#0066FF] text-xs rounded-2xl px-4 py-3 mb-4">
-              <Info size={14} className="shrink-0 mt-0.5" />
-              <span>
-                Email and password are managed by Supabase Auth and cannot be
-                changed here.
-              </span>
-            </div>
+            
 
             {banner && (
               <div className="flex items-start gap-2 bg-[#FEE9EB] text-[#DC2626] text-sm rounded-2xl px-4 py-3 mb-4">
@@ -692,22 +824,16 @@ export default function Employees() {
                 hint={checkingId ? 'Checking availability…' : 'Must be unique'}
                 onChange={(e) => setField('employee_id', e.target.value)}
               />
-              <SelectField
+                            <Field
                 id="edit_department"
                 label="Department *"
                 icon={Building2}
+                placeholder="e.g., IT, HR, Sales"
                 value={form.department}
                 disabled={saving}
                 error={errors.department}
-                onChange={(v) => setField('department', v)}
-              >
-                <option value="">Select department</option>
-                {departmentOptions.map((d) => (
-                  <option key={d} value={d}>
-                    {d}
-                  </option>
-                ))}
-              </SelectField>
+                onChange={(e) => setField('department', e.target.value)}
+              />
               <Field
                 id="edit_position"
                 label="Position *"
@@ -759,6 +885,87 @@ export default function Employees() {
               </button>
             </div>
           </form>
+        </div>
+      )}
+
+      {deactivateTarget && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="deactivate-employee-title"
+        >
+          <div
+            className="absolute inset-0 bg-black/50 cursor-pointer"
+            onClick={() => !deactivating && setDeactivateTarget(null)}
+          />
+
+          <div
+            className={`relative ${CARD} w-full max-w-md p-6 sm:p-8`}
+            style={{ boxShadow: CARD_SHADOW }}
+          >
+            <div className="flex items-start gap-3 mb-4">
+              <div className={ICON_BADGE} style={{ backgroundColor: '#FEE9EB' }}>
+                <UserX size={18} color="#DC2626" />
+              </div>
+              <div className="flex-1">
+                <h2
+                  id="deactivate-employee-title"
+                  className="font-bold text-[#0F1E36] tracking-tight"
+                >
+                  Deactivate Employee
+                </h2>
+                <p className="text-xs text-[#64748B]">
+                  This deactivates{' '}
+                  {deactivateTarget.full_name || deactivateTarget.email}. They
+                  will not be able to sign in to the mobile app until you
+                  activate the account again. Their records are kept.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setDeactivateTarget(null)}
+                disabled={deactivating}
+                aria-label="Close"
+                className="p-2 -mt-1 -mr-1 rounded-xl text-gray-400 hover:text-[#0F1E36] hover:bg-[#F8FAFD] transition disabled:opacity-50"
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {deactivateError && (
+              <div className="flex items-start gap-2 bg-[#FEE9EB] text-[#DC2626] text-sm rounded-2xl px-4 py-3 mb-4">
+                <AlertCircle size={16} className="shrink-0 mt-0.5" />
+                <span>{deactivateError}</span>
+              </div>
+            )}
+
+            <div className="flex flex-col-reverse sm:flex-row gap-3 sm:justify-end pt-2">
+              <button
+                type="button"
+                onClick={() => setDeactivateTarget(null)}
+                disabled={deactivating}
+                className={`${SECONDARY_BUTTON} flex items-center justify-center gap-2`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={handleDeactivate}
+                disabled={deactivating}
+                className="bg-[#DC2626] text-white font-bold rounded-2xl py-4 px-6 shadow-[0_4px_12px_rgba(220,38,38,0.25)] hover:bg-[#B91C1C] active:scale-[0.98] transition disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2 sm:min-w-[10rem]"
+              >
+                {deactivating ? (
+                  <>
+                    <Loader2 size={18} className="animate-spin" />
+                    Deactivating…
+                  </>
+                ) : (
+                  'Deactivate'
+                )}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

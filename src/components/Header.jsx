@@ -4,11 +4,11 @@ import { useAuth } from '../context/useAuth';
 import { getInitials } from '../lib/format';
 
 const TITLES = [
-  { match: '/dashboard', title: 'Dashboard' },
-  { match: '/employees/add', title: 'Add Employee' },
-  { match: '/employees', title: 'View Employees' },
-  { match: '/approvals/leaves', title: 'Leave Approvals' },
-  { match: '/attendance', title: 'Attendance' },
+  { match: '/dashboard', title: '' },
+  { match: '/employees/add', title: '' },
+  { match: '/employees', title: '' },
+  { match: '/approvals/leaves', title: '' },
+  { match: '/attendance', title: '' },
   { match: '/reports', title: 'Reports' },
 ];
 

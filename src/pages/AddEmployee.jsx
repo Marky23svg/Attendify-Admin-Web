@@ -59,7 +59,7 @@ function SelectField({ id, label, icon: Icon, value, error, onChange, disabled, 
           value={value}
           disabled={disabled}
           onChange={(e) => onChange(e.target.value)}
-          className="flex-1 py-3.5 ml-3 bg-transparent text-sm text-[#0F1E36] outline-none cursor-pointer w-full min-w-0"
+          className="appearance-none flex-1 py-3.5 ml-3 bg-transparent text-sm text-[#0F1E36] outline-none cursor-pointer w-full min-w-0"
         >
           {children}
         </select>
@@ -272,12 +272,16 @@ export default function AddEmployee() {
               value={form.employee_id} disabled={submitting} error={errors.employee_id}
               hint={checkingId ? 'Checking availability…' : 'Must be unique'}
               onChange={(e) => setField('employee_id', e.target.value)} />
-            <SelectField id="department" label="Department *" icon={Building2}
-              value={form.department} disabled={submitting} error={errors.department}
-              onChange={(v) => setField('department', v)}>
-              <option value="">Select department</option>
-              {DEPARTMENTS.map((d) => (<option key={d} value={d}>{d}</option>))}
-            </SelectField>
+                        <Field 
+              id="department" 
+              label="Department *" 
+              icon={Building2}
+              placeholder="e.g., IT, HR, Sales"
+              value={form.department} 
+              disabled={submitting} 
+              error={errors.department}
+              onChange={(e) => setField('department', e.target.value)} 
+            />
             <Field id="position" label="Position *" icon={Briefcase} placeholder="Software Engineer"
               value={form.position} disabled={submitting} error={errors.position}
               onChange={(e) => setField('position', e.target.value)} />
