@@ -10,6 +10,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../context/useAuth';
 import StatCard from '../components/StatCard';
 import { CARD_SHADOW, CARD } from '../lib/design';
 import { getInitials, formatDate } from '../lib/format';
@@ -37,6 +38,7 @@ function parseDateOnly(value) {
 }
 
 export default function Dashboard() {
+  const { profile: adminProfile } = useAuth();
   const [employees, setEmployees] = useState([]);
   const [leaves, setLeaves] = useState([]);
   const [todayAttendance, setTodayAttendance] = useState([]);
@@ -191,17 +193,30 @@ export default function Dashboard() {
   }, [employees, todayAttendance, leaves, settings]);
 
   const handleDecision = async (id, status) => {
+    if (!adminProfile?.id) {
+      setNotice('Could not identify your admin account.');
+      return;
+    }
     setActingId(id);
+    const reviewedAt = new Date().toISOString();
     const { error } = await supabase
       .from('leave_requests')
-      .update({ status })
+      .update({
+        status,
+        reviewed_by: adminProfile.id,
+        reviewed_at: reviewedAt,
+      })
       .eq('id', id);
 
     if (error) {
       setNotice(`Could not update request: ${error.message}`);
     } else {
       setLeaves((prev) =>
-        prev.map((l) => (l.id === id ? { ...l, status } : l))
+        prev.map((l) =>
+          l.id === id
+            ? { ...l, status, reviewed_by: adminProfile.id, reviewed_at: reviewedAt }
+            : l
+        )
       );
     }
     setActingId(null);
