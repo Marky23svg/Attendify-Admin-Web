@@ -142,9 +142,9 @@ function TimeCard({ title, time, location, selfieUrl, onPreview }) {
           <p className="text-[#0F1E36] font-bold text-base">{title}</p>
         </div>
 
-        <div className="flex items-center gap-1 mt-2">
-          <MapPin size={13} color="#0066FF" />
-          <p className="text-[#64748B] text-xs truncate">
+        <div className="flex items-start gap-1 mt-2">
+          <MapPin size={13} color="#0066FF" className="mt-0.5 shrink-0" />
+          <p className="text-[#64748B] text-xs flex-1 min-w-0 break-words">
             {location || 'No location'}
           </p>
         </div>

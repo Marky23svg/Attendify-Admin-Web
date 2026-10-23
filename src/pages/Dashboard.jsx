@@ -141,7 +141,7 @@ export default function Dashboard() {
     // Present today = records with time_in
     const present = todayAttendance.filter((a) => a.time_in).length;
 
-    // On leave today = pending or approved leaves that cover today
+    // On leave today = approved leaves that cover today
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const todayKey = dateKey(new Date());
@@ -151,12 +151,12 @@ export default function Dashboard() {
     const approvedTodayIds = new Set();
     leaves.forEach((l) => {
       if (l.status === 'pending') pendingCount += 1;
-      if (l.status !== 'pending' && l.status !== 'approved') return;
+      if (l.status !== 'approved') return;
       const start = parseDateOnly(l.start_date);
       const end = parseDateOnly(l.end_date);
       if (today >= start && today <= end) {
         onLeave += 1;
-        if (l.status === 'approved') approvedTodayIds.add(l.user_id);
+        approvedTodayIds.add(l.user_id);
       }
     });
 
