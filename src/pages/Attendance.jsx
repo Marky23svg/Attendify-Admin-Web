@@ -388,8 +388,8 @@ export default function Attendance() {
             now,
             settings: workSchedule,
             createdAtKey: s.created_at ? toDateString(new Date(s.created_at)) : null,
-            attended: (k) => k === dayKey && attendedIds.has(s.user_id),
-            onApprovedLeave: (k) => k === dayKey && onLeaveIds.has(s.user_id),
+            attended: (k) => k === dayKey && attendedIds.has(s.id),
+            onApprovedLeave: (k) => k === dayKey && onLeaveIds.has(s.id),
           })
         ) {
           absentCount += 1;
